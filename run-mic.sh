@@ -5,7 +5,7 @@ export VENDOR="xiaomi"
 export DEVICE="mido"
 export PORT_ARCH="armv7hl"
 export EXTRA_NAME=-devel-`date +%Y%m%d`
-export RELEASE="5.0.0.21"
+export RELEASE="5.0.0.29"
 
 sudo mic create fs --arch=$PORT_ARCH \
 --tokenmap=ARCH:$PORT_ARCH,RELEASE:$RELEASE,EXTRA_NAME:$EXTRA_NAME \
