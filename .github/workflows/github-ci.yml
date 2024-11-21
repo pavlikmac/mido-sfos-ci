@@ -33,7 +33,7 @@ jobs:
       - name: Archive artifacts
         run: |
           # Check the output directory inside Docker and then copy it
-          sudo docker exec sailfish-sdk ls /workspace/sfe-mido-5.0.0.21-devel-20241121/sailfishos-mido-release-5.0.0.21-devel-20241121.zip
+          sudo docker exec sailfish-sdk ls /workspace/sfe-mido-5.0.0.29-devel-20241121/sailfishos-mido-release-5.0.0.29-devel-20241121.zip
           # Adjust the path based on the output of the previous step
           sudo mkdir -p /home/runner/work/mido-sfos-ci/mido-sfos-ci/artifacts/
           sudo docker cp sailfish-sdk:/workspace/sfe-mido-5.0.0.29-devel-20241121/sailfishos-mido-release-5.0.0.29-devel-20241121.zip /home/runner/work/mido-sfos-ci/mido-sfos-ci/artifacts/
