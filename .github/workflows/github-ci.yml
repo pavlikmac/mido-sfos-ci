@@ -53,7 +53,7 @@ jobs:
         #if: steps.compile.outputs.status == 'success' && !cancelled()
         with:
           tag: mido_sailfish
-          artifacts: /workdir/*
+          artifacts: /home/runner/work/mido-sfos-ci/mido-sfos-ci/artifacts/*
           allowUpdates: true
           token: ${{ secrets.GITHUB_TOKEN }}
           body: |
