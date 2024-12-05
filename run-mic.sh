@@ -4,7 +4,7 @@ export ANDROID_ROOT="/parentroot/srv/hadk"
 export VENDOR="xiaomi"
 export DEVICE="mido"
 export PORT_ARCH="armv7hl"
-export EXTRA_NAME=-devel-`date +%Y%m%d`
+export EXTRA_NAME=-devel
 export RELEASE="5.0.0.29"
 
 sudo mkdir -p /proc/sys/fs/binfmt_misc/
