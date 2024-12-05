@@ -47,4 +47,9 @@ jobs:
         run: |
           sudo docker stop sailfish-sdk
           sudo docker rm sailfish-sdk
-          
+
+      - name: Release
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: ${{env.ANDROID_ROOT}}/SailfishOScommunity-release-*/sailfishos-*-${{env.DEVICE}}*.zip
