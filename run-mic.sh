@@ -3,7 +3,7 @@ export PLATFORM_SDK_ROOT="/srv/mer"
 export ANDROID_ROOT="/parentroot/srv/hadk"
 export VENDOR="xiaomi"
 export DEVICE="mido"
-export PORT_ARCH="armv7hl"
+export PORT_ARCH="aarch64"
 export EXTRA_NAME=-devel
 export RELEASE="5.0.0.29"
 
