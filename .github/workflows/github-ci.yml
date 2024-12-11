@@ -55,7 +55,7 @@ jobs:
         #if: steps.compile.outputs.status == 'success' && !cancelled()
         with:
           tag: mido
-          artifacts: sailfishos-mido-release-5.0.0.29-devel.zip
+          artifacts: /home/runner/work/mido-sfos-ci/mido-sfos-ci/artifacts/*.zip
           allowUpdates: true
           token: ${{ secrets.GITHUB_TOKEN }}
           body: |
