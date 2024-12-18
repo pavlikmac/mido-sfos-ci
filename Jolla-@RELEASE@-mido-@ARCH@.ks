@@ -1,29 +1,28 @@
-# DisplayName: Jolla mido/@ARCH@ (release) 1
+# DisplayName: Jolla mido/@ARCH@ (release) 0.5.8+master.20241104134713.c99020b
 # KickstartType: release
+# DeviceModel: mido
+# DeviceVariant: mido
+# Brand: Jolla
 # SuggestedImageType: fs
 # SuggestedArchitecture: armv7hl
 
-user --name nemo --groups audio,video --password nemo
 timezone --utc UTC
-keyboard us
-lang en_US.UTF-8
 
 ### Commands from /tmp/sandbox/usr/share/ssu/kickstart/part/default
 part / --size 500 --ondisk sda --fstype=ext4
 
 ## No suitable configuration found in /tmp/sandbox/usr/share/ssu/kickstart/bootloader
 
-repo --name=adaptation-community-common-mido-@RELEASE@ --baseurl=http://repo.merproject.org/obs/nemo:/devel:/hw:/common/sailfish_latest_@ARCH@/
-repo --name=adaptation-community-mido-@RELEASE@ --baseurl=http://repo.merproject.org/obs/nemo:/devel:/hw:/xiaomi:/mido/sailfish_latest_@ARCH@/
+repo --name=adaptation-common-mido-@RELEASE@ --baseurl=https://releases.jolla.com/releases/@RELEASE@/jolla-hw/adaptation-common/@ARCH@/
+repo --name=adaptation-community-common-mido-@RELEASE@ --baseurl=https://repo.sailfishos.org/obs/nemo:/devel:/hw:/common/sailfish_latest_@ARCH@/
 repo --name=apps-@RELEASE@ --baseurl=https://releases.jolla.com/jolla-apps/@RELEASE@/@ARCH@/
+repo --name=customer-jolla-@RELEASE@ --baseurl=https://releases.jolla.com/features/@RELEASE@/customers/jolla/@ARCH@/
 repo --name=hotfixes-@RELEASE@ --baseurl=https://releases.jolla.com/releases/@RELEASE@/hotfixes/@ARCH@/
 repo --name=jolla-@RELEASE@ --baseurl=https://releases.jolla.com/releases/@RELEASE@/jolla/@ARCH@/
 
 %packages
-@Jolla Configuration mido
-#patterns-sailfish-device-configuration-mido
+patterns-sailfish-device-configuration-mido
 %end
-
 
 %attachment
 ### Commands from /tmp/sandbox/usr/share/ssu/kickstart/attachment/mido
@@ -34,17 +33,17 @@ repo --name=jolla-@RELEASE@ --baseurl=https://releases.jolla.com/releases/@RELEA
 
 %end
 
-%pre
+%pre --erroronfail
 export SSU_RELEASE_TYPE=release
 ### begin 01_init
 touch $INSTALL_ROOT/.bootstrap
 ### end 01_init
 %end
 
-%post
+%post --erroronfail
 export SSU_RELEASE_TYPE=release
 ### begin 01_arch-hack
-if [ "@ARCH@" == armv7hl ] || [ "@ARCH@" == armv7tnhl ]; then
+if [ "@ARCH@" == armv7hl ] || [ "@ARCH@" == armv7tnhl ] || [ "@ARCH@" == aarch64 ]; then
     # Without this line the rpm does not get the architecture right.
     echo -n "@ARCH@-meego-linux" > /etc/rpm/platform
 
@@ -67,14 +66,13 @@ rm -f /.bootstrap
 # export some important variables until there's a better solution
 export LANG=en_US.UTF-8
 export LC_COLLATE=en_US.UTF-8
-export GSETTINGS_BACKEND=gconf
 
 # run the oneshot triggers for root and first user uid
 UID_MIN=$(grep "^UID_MIN" /etc/login.defs |  tr -s " " | cut -d " " -f2)
 DEVICEUSER=`getent passwd $UID_MIN | sed 's/:.*//'`
 
 if [ -x /usr/bin/oneshot ]; then
-   su -c "/usr/bin/oneshot --mic"
+   /usr/bin/oneshot --mic
    su -c "/usr/bin/oneshot --mic" $DEVICEUSER
 fi
 ### end 50_oneshot
@@ -100,72 +98,120 @@ then
     ssu domain sailfish
 fi
 ### end 70_sdk-domain
+### begin 90_accept_unsigned_packages
+sed -i /etc/zypp/zypp.conf \
+    -e '/^# pkg_gpgcheck =/ c \
+# Modified by kickstart. See sdk-configs sources\
+pkg_gpgcheck = off
+'
+### end 90_accept_unsigned_packages
+### begin 90_zypper_skip_check_access_deleted
+sed -i /etc/zypp/zypper.conf \
+    -e '/^# *psCheckAccessDeleted =/ c \
+# Modified by kickstart. See sdk-configs sources\
+psCheckAccessDeleted = no
+'
+### end 90_zypper_skip_check_access_deleted
 %end
 
-%post --nochroot
+%post --nochroot --erroronfail
 export SSU_RELEASE_TYPE=release
-### begin 01_release
-if [ -n "$IMG_NAME" ]; then
-    echo "BUILD: $IMG_NAME" >> $INSTALL_ROOT/etc/meego-release
+### begin 50_os-release
+(
+CUSTOMERS=$(find $INSTALL_ROOT/usr/share/ssu/features.d -name 'customer-*.ini' \
+    |xargs --no-run-if-empty sed -n 's/^name[[:space:]]*=[[:space:]]*//p')
+
+cat $INSTALL_ROOT/etc/os-release
+echo "SAILFISH_CUSTOMER=\"${CUSTOMERS//$'\n'/ }\""
+) > $IMG_OUT_DIR/os-release
+### end 50_os-release
+### begin 99_check_shadow
+IS_BAD=0
+
+echo "Checking that no user has password set in /etc/shadow."
+# This grep prints users that have password set, normally nothing
+if grep -vE '^[^:]+:[*!]{1,2}:' $INSTALL_ROOT/etc/shadow
+then
+    echo "A USER HAS PASSWORD SET! THE IMAGE IS NOT SAFE!"
+    IS_BAD=1
 fi
-### end 01_release
-### begin mido
-cp $INSTALL_ROOT/etc/sailfish-release $IMG_OUT_DIR
-### end mido
+
+# Checking that all users use shadow in passwd,
+# if they weren't the check above would be useless
+if grep -vE '^[^:]+:x:' $INSTALL_ROOT/etc/passwd
+then
+    echo "BAD PASSWORD IN /etc/passwd! THE IMAGE IS NOT SAFE!"
+    IS_BAD=1
+fi
+
+# Fail image build if checks fail
+[ $IS_BAD -eq 0 ] && echo "No passwords set, good." || exit 1
+### end 99_check_shadow
 %end
 
-%pack
+%pack --erroronfail
 export SSU_RELEASE_TYPE=release
 ### begin hybris
-pushd $IMG_OUT_DIR
+pushd $IMG_OUT_DIR # ./sfe-$DEVICE-$RELEASE_ID
 
 DEVICE=mido
+EXTRA_NAME=@EXTRA_NAME@
+DATE=$(date +"%Y%m%d") # 20191101
 
-VERSION_FILE=./sailfish-release
-source $VERSION_FILE
+# Source release info e.g. VERSION
+source ./os-release
 
-# Locate rootfs tar.bz2 archive.
+# Locate rootfs .tar.bz2 archive
 for filename in *.tar.bz2; do
-    GEN_IMG_BASE=$(basename $filename .tar.bz2)
+	GEN_IMG_BASE=$(basename $filename .tar.bz2) # sfe-$DEVICE-3.2.0.12
 done
-
 if [ ! -e "$GEN_IMG_BASE.tar.bz2" ]; then
-    echo "No rootfs archive found, exiting ..."
-    exit 1
+	echo "[hybris-installer] No rootfs archive found, exiting..."
+	exit 1
 fi
 
-IMG_SIZE=$(du -h $GEN_IMG_BASE.tar.bz2 | cut -f1)
+# Make sure we have 'bc' to estimate rootfs size
+zypper --non-interactive in bc &> /dev/null
+
+# Roughly estimate the final rootfs size when installed
+IMAGE_SIZE=`echo "scale=2; 2.25 * $(du -h $GEN_IMG_BASE.tar.bz2 | cut -d'M' -f1)" | bc`
+echo "[hybris-installer] Estimated rootfs size when installed: ${IMAGE_SIZE}M"
 
 # Output filenames
-DST_IMG_BASE=$ID-$DEVICE-$SAILFISH_FLAVOUR-$VERSION_ID@EXTRA_NAME@
-DST_IMG=$DST_IMG_BASE.tar.bz2
+DST_IMG=sfos-rootfs.tar.bz2
+DST_PKG=$ID-$VERSION_ID-$DATE-$DEVICE$EXTRA_NAME # sailfishos-3.2.0.12-20191101-$DEVICE
 
-# Copy boot image, updater scripts and updater binary into updater .zip tree.
-mkdir -p updater/META-INF/com/google/android
+# Clone hybris-installer if not preset (e.g. porters-ci build env)
+if [ ! -d ../hybris/hybris-installer/ ]; then
+	git clone --depth 1 https://github.com/sailfish-on-ginkgo/hybris-installer ../hybris/hybris-installer > /dev/null
+fi
 
-mv update-binary updater/META-INF/com/google/android/update-binary
-mv hybris-updater-script updater/META-INF/com/google/android/updater-script
-mv hybris-updater-unpack.sh updater/updater-unpack.sh
-mv hybris-boot.img updater/hybris-boot.img
-
-# Temporarily move the rootfs into the updater directory
+# Copy rootfs & hybris-installer scripts into updater .zip tree
+mkdir updater/
 mv $GEN_IMG_BASE.tar.bz2 updater/$DST_IMG
+cp -r ../hybris/hybris-installer/hybris-installer/* updater/
 
-# Update updater-script with image details.
-sed -i -e "s %VERSION% $VERSION_ID g" -e "s %IMAGE_FILE% $DST_IMG g" -e "s %IMAGE_SIZE% $IMG_SIZE g" updater/META-INF/com/google/android/updater-script
+# Update install script with image details
+LOS_VER="14.1"
+sed -e "s/%DEVICE%/$DEVICE/g" -e "s/%VERSION%/$VERSION/g" -e "s/%VERSION_ID%/$VERSION_ID/g" -e "s/%DATE%/$DATE/g" -e "s/%IMAGE_SIZE%/${IMAGE_SIZE}M/g" -e "s/%DST_PKG%/$DST_PKG/g" -e "s/%LOS_VER%/$LOS_VER/g" -i updater/META-INF/com/google/android/update-binary
 
-# pack updater .zip
-pushd updater
-zip -r ../$DST_IMG_BASE.zip META-INF/com/google/android/update-binary META-INF/com/google/android/updater-script updater-unpack.sh hybris-boot.img $DST_IMG_BASE.ks $DST_IMG
-popd # updater
+# Pack updater .zip
+pushd updater # sfe-$DEVICE-$RELEASE_ID/updater
+echo "[hybris-installer] Creating package '$DST_PKG.zip'..."
+zip -r ../$DST_PKG.zip .
+mv $DST_IMG ../$GEN_IMG_BASE.tar.bz2
+popd # sfe-$DEVICE-$RELEASE_ID
 
-# Move the rootfs back out of the updater directory
-mv updater/$DST_IMG $GEN_IMG_BASE.tar.bz2
+# Clean up working directory
+rm -rf updater/
 
-# Clean up updater .zip working directory.
-rm -rf updater
+# Calculate some checksums for the generated zip
+printf "[hybris-installer] Calculating MD5, SHA1 & SHA256 checksums for '$DST_PKG.zip'..."
+md5sum $DST_PKG.zip > $DST_PKG.zip.md5sum
+sha1sum $DST_PKG.zip > $DST_PKG.zip.sha1sum
+sha256sum $DST_PKG.zip > $DST_PKG.zip.sha256sum
+echo " DONE!"
 
-popd # $IMG_OUT_DIR
+popd # hadk source tree
 ### end hybris
 %end
-
