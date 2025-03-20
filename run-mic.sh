@@ -5,7 +5,7 @@ export VENDOR="xiaomi"
 export DEVICE="mido"
 export PORT_ARCH="aarch64"
 export EXTRA_NAME=-devel
-export RELEASE="5.0.0.43"
+export RELEASE="latest"
 
 sudo mkdir -p /proc/sys/fs/binfmt_misc/
 sudo mount binfmt_misc -t binfmt_misc /proc/sys/fs/binfmt_misc
