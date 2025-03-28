@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       set_example:
-        description: "oneplus"
+        description: "xiaomi"
         required: true
         default: "mido"
 
